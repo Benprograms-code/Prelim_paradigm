@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -9,7 +10,7 @@ import (
 // json struct to store data
 type todo struct {
 	ID        string `json:"id"`
-	Item      string `json:"title"`
+	Item      string `json:"item"`
 	Completed bool   `json:"completed"`
 }
 
@@ -28,13 +29,61 @@ var todos = []todo{
 	{ID: "11", Item: "Learn CI/CD", Completed: false},
 }
 
+func addTodo(context *gin.Context) {
+	var newtodo todo
+
+	//error catchment using golang error handling
+	if error := context.BindJSON(&newtodo); error != nil {
+		return
+	}
+
+	todos = append(todos, newtodo)
+	context.IndentedJSON(http.StatusCreated, newtodo)
+
+}
+
+func getTodo(context *gin.Context) {
+	id := context.Param("id")
+
+	todo, err := getTodoById(id)
+	if err != nil {
+		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "todo not found"})
+		return
+	}
+	context.IndentedJSON(http.StatusOK, todo)
+}
+
 // json converter function
 func getTodos(context *gin.Context) {
 	context.IndentedJSON(http.StatusOK, todos)
 }
 
+func getTodoById(id string) (*todo, error) {
+	for i, t := range todos {
+		if t.ID == id {
+			return &todos[i], nil
+		}
+	}
+	return nil, errors.New("todo not found")
+}
+func toggleTodoSatus(context *gin.Context) {
+	id := context.Param("id")
+	todo, err := getTodoById(id)
+
+	if err != nil {
+		context.IndentedJSON(http.StatusNotFound, gin.H{"message": "todo not found"})
+		return
+	}
+
+	todo.Completed = !todo.Completed
+	context.IndentedJSON(http.StatusOK, todo)
+}
+
 func main() {
 	router := gin.Default()
 	router.GET("/todos", getTodos)
-	router.Run("Localhost:9090")
+	router.GET("/todos/:id", getTodo)
+	router.PATCH("/todos/:id", toggleTodoSatus)
+	router.POST("/todos", addTodo)
+	router.Run("localhost:9090")
 }
